@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sơ Đồ Chia Nhóm & Đội Trưởng</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg-body: #f8fafc;
+            --leader-color: #f59e0b;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .table-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .table-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .student-item {
+            background-color: #f8fafc;
+            border-left: 3px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+
+        .student-item.filled {
+            border-left-color: var(--primary);
+            background-color: #f5f3ff;
+        }
+
+        .student-item.is-leader {
+            border-left-color: var(--leader-color) !important;
+            background-color: #fffbeb !important;
+        }
+
+        /* Tooltip Styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 280px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 12px;
+            position: absolute;
+            z-index: 50;
+            top: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent #1e293b transparent;
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        @keyframes shuffle {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.98); }
+            100% { transform: scale(1); }
+        }
+        .shuffling {
+            animation: shuffle 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-indigo-600 uppercase tracking-tight italic text-shadow-sm">Chia lớp, chia đội</h1>
+                <p class="text-gray-500 text-sm italic">Hỗ trợ Thầy Cô chia nhóm học tập nhanh chóng.</p>
+            </div>
+            
+            <div class="flex flex-wrap gap-2 items-center">
+                <!-- Tooltip Nạp CSV -->
+                <div class="tooltip-container">
+                    <label class="flex items-center px-4 py-2 bg-white border border-indigo-200 rounded-lg cursor-pointer hover:bg-indigo-50 transition shadow-sm border-2">
+                        <span class="text-sm font-bold text-indigo-700">📁 Nạp CSV</span>
+                        <input type="file" id="csv-file" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+                    </label>
+                    <div class="tooltip-text">
+                        <strong>💡 Hướng dẫn:</strong> Thầy cô có thể nạp danh sách lớp mình bằng file Excel. Hãy điền danh sách lớp vào file trống ở <strong>cột A</strong>, sau đó chọn <strong>File -> Save As -> Xuất file dạng đuôi *.csv</strong>.
+                    </div>
+                </div>
+
+                <button onclick="randomizeSeats()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-md font-bold flex items-center gap-2">
+                    <span>🎲 Xáo Trộn</span>
+                </button>
+                <button onclick="toggleLeaders()" id="btn-leader" class="bg-amber-500 text-white px-5 py-2.5 rounded-lg hover:bg-amber-600 transition shadow-md font-bold flex items-center gap-2">
+                    <span>⭐ Đội Trưởng</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tổng học sinh</label>
+                <input type="number" id="input-student-count" value="12" min="1" oninput="updateCounts()" 
+                    class="w-full text-xl font-bold text-gray-800 focus:outline-none">
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Số người / Bàn</label>
+                <select id="input-per-table" onchange="updateCounts()" class="w-full text-xl font-bold text-gray-800 focus:outline-none bg-transparent cursor-pointer">
+                    <option value="2">2 Người</option>
+                    <option value="3">3 Người</option>
+                    <option value="4" selected>4 Người</option>
+                </select>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase">Số lượng Bàn</label>
+                    <button onclick="autoCalcTables()" class="text-[9px] bg-indigo-50 px-2 py-0.5 rounded text-indigo-600 font-bold hover:bg-indigo-100 uppercase">Tự tính</button>
+                </div>
+                <input type="number" id="input-table-count" value="3" min="1" oninput="updateCounts()"
+                    class="w-full text-xl font-bold text-gray-800 focus:outline-none">
+            </div>
+            <div class="bg-indigo-600 p-4 rounded-xl shadow-md flex flex-col justify-center text-white">
+                <p class="text-[10px] font-bold uppercase opacity-80 italic">Trạng thái hệ thống</p>
+                <p class="text-sm font-semibold" id="status-text">Đang sẵn sàng...</p>
+            </div>
+        </div>
+
+        <!-- Seating Grid -->
+        <div id="seating-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-all">
+            <!-- Render tables here -->
+        </div>
+    </div>
+
+    <script>
+        let students = Array.from({length: 12}, (_, i) => `Học sinh ${i + 1}`);
+        let showLeaders = false;
+
+        function autoCalcTables() {
+            const studentCount = students.length;
+            const perTable = parseInt(document.getElementById('input-per-table').value);
+            document.getElementById('input-table-count').value = Math.ceil(studentCount / perTable);
+            renderMap();
+        }
+
+        function updateCounts() {
+            const studentCountInput = parseInt(document.getElementById('input-student-count').value) || 0;
+            if (studentCountInput > students.length) {
+                for (let i = students.length; i < studentCountInput; i++) {
+                    students.push(`Học sinh ${i + 1}`);
+                }
+            } else if (studentCountInput < students.length) {
+                students = students.slice(0, studentCountInput);
+            }
+            renderMap();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                students = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                document.getElementById('input-student-count').value = students.length;
+                autoCalcTables();
+                randomizeSeats();
+            };
+            reader.readAsText(file, "UTF-8");
+        }
+
+        function randomizeSeats() {
+            const grid = document.getElementById('seating-grid');
+            grid.classList.add('shuffling');
+            
+            setTimeout(() => {
+                for (let i = students.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [students[i], students[j]] = [students[j], students[i]];
+                }
+                renderMap();
+                grid.classList.remove('shuffling');
+            }, 300);
+        }
+
+        function toggleLeaders() {
+            showLeaders = !showLeaders;
+            const btn = document.getElementById('btn-leader');
+            if(showLeaders) {
+                btn.classList.replace('bg-amber-500', 'bg-slate-800');
+                btn.innerHTML = '<span>🚫 Bỏ Đội Trưởng</span>';
+            } else {
+                btn.classList.replace('bg-slate-800', 'bg-amber-500');
+                btn.innerHTML = '<span>⭐ Đội Trưởng</span>';
+            }
+            renderMap();
+        }
+
+        function renderMap() {
+            const grid = document.getElementById('seating-grid');
+            const statusText = document.getElementById('status-text');
+            const tableCount = parseInt(document.getElementById('input-table-count').value) || 1;
+            const perTable = parseInt(document.getElementById('input-per-table').value) || 1;
+            
+            grid.innerHTML = '';
+            statusText.innerText = `Xếp ${students.length} người vào ${tableCount} bàn.`;
+
+            for (let t = 0; t < tableCount; t++) {
+                const tableDiv = document.createElement('div');
+                tableDiv.className = "table-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3";
+                
+                let studentListHtml = '';
+                let occupiedInTable = 0;
+
+                for (let s = 0; s < perTable; s++) {
+                    const studentIndex = (t * perTable) + s;
+                    const name = students[studentIndex];
+                    const isLeader = (showLeaders && s === 0 && name);
+
+                    if (name) {
+                        occupiedInTable++;
+                        studentListHtml += `
+                            <div class="student-item filled p-2 rounded-lg text-sm font-semibold text-gray-700 flex justify-between items-center shadow-sm ${isLeader ? 'is-leader' : ''}">
+                                <span class="truncate pr-2">${isLeader ? '⭐ ' : ''}${name}</span>
+                                <span class="text-[9px] ${isLeader ? 'bg-amber-200 text-amber-800' : 'bg-indigo-100 text-indigo-600'} px-1.5 py-0.5 rounded whitespace-nowrap">
+                                    ${isLeader ? 'ĐỘI TRƯỞNG' : `VT ${s+1}`}
+                                </span>
+                            </div>`;
+                    } else {
+                        studentListHtml += `
+                            <div class="student-item p-2 rounded-lg text-sm font-medium text-gray-300 italic border-dashed border-2 border-gray-50 flex justify-between items-center">
+                                <span>Trống</span>
+                            </div>`;
+                    }
+                }
+
+                tableDiv.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-gray-50 pb-2 mb-1">
+                        <h3 class="font-black text-gray-800 tracking-tight text-xs uppercase">Bàn số ${t + 1}</h3>
+                        <span class="text-[10px] font-bold ${occupiedInTable === perTable ? 'text-green-500' : 'text-orange-400'}">
+                            ${occupiedInTable}/${perTable} CHỖ
+                        </span>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        ${studentListHtml}
+                    </div>
+                `;
+                grid.appendChild(tableDiv);
+            }
+        }
+
+        window.onload = renderMap;
+    </script>
+</body>
+</html>
